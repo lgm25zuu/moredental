@@ -2,55 +2,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-// 【AIデザイン着せ替え設定】
-// 1:ネイビー(信頼)  2:サクラ(優しい)  3:ミント(清潔)  4:ゴールド(高級)
 const DESIGN_TYPE = 1;
 
-const GAS_URL = "AKfycbztTPKtxkVteG5L3oEADxdH4NZrvWuGYqQ64fkO1uyxxyTdkP7dhnKlB9xd8Mt2yylRLQ";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzWZBmbZePQCLfr1DpRpAmhqSoGiTWU_he5WHh7oWpePgu07vtrd7SHojCx1cWY6ABHog/exec";
 const STORAGE_KEY = "dental_form_draft";
-
-// =========================================================
-// ★ GASのdoPost関数に差し替えが必要なコード（参考コメント）
-// =========================================================
-// function doPost(e) {
-//   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-//   var data = JSON.parse(e.postData.contents);
-//
-//   sheet.appendRow([
-//     new Date(),
-//     data.name, data.furigana, data.gender, data.birthday,
-//     data.zip, data.address, data.phone, data.email,
-//     data.trigger, data.referrerName, data.referrerReason,
-//     data.reasons       ? data.reasons.join(', ')       : 'なし',
-//     data.mainComplaintDetail || 'なし',
-//     data.allergy, data.allergyDetail,
-//     data.anesthesiaStatus, data.anesthesiaDetail,
-//     data.hospitalStatus, data.diseaseName, data.hospitalName,
-//     data.medicineStatus, data.medicineNames,
-//     data.medicineImageName ? '画像あり: ' + data.medicineImageName : 'なし',
-//     data.commuteFrom,
-//     data.availableDays ? data.availableDays.join(', ')  : 'なし',
-//     data.commuteCondition, data.preference,
-//     data.mindset, data.explanationStyle,
-//     data.currentScore, data.targetScore,
-//     data.brushingTime  ? data.brushingTime.join(', ')  : 'なし',
-//     data.tools         ? data.tools.join(', ')         : 'なし',
-//     data.smoking, data.sleepTime,
-//     data.beverageStatus, data.beverageDetail, data.snackHabit,
-//   ]);
-//
-//   MailApp.sendEmail({
-//     to: data.email,
-//     subject: "【受領確認】問診票を送信いたしました",
-//     body: data.name + " 様\n\nご入力ありがとうございました。内容を確認いたしました。"
-//   });
-//
-//   // ★ CORSヘッダーを有効にするにはウェブアプリを「全員（匿名ユーザーを含む）」で再デプロイしてください
-//   return ContentService
-//     .createTextOutput(JSON.stringify({ result: "success" }))
-//     .setMimeType(ContentService.MimeType.JSON);
-// }
-// =========================================================
 
 export default function CompleteClinicForm() {
   const themes = {
@@ -61,29 +16,21 @@ export default function CompleteClinicForm() {
   };
   const theme = themes[DESIGN_TYPE as keyof typeof themes];
 
-  // Step 8 = 確認サマリー、Step 9 = 当院の想い・送信
   const totalSteps = 9;
 
   const initialFormData = {
-    // Step 1
     name: '', furigana: '', gender: '', birthday: '',
     zip: '', address: '', phone: '', email: '',
-    // Step 2
     trigger: '', referrerName: '', referrerReason: '',
-    // Step 3
     reasons: [] as string[], mainComplaintDetail: '',
-    // Step 4
     allergy: '', allergyDetail: '', allergyReaction: '',
     anesthesiaStatus: '', anesthesiaDetail: '',
     hospitalStatus: '', diseaseName: '', hospitalName: '',
     medicineStatus: '', medicineNames: '',
     medicineImageBase64: '' as string,
     medicineImageName: '' as string,
-    // Step 5
     commuteFrom: '', availableDays: [] as string[], commuteCondition: '', preference: '',
-    // Step 6
     mindset: '', explanationStyle: '',
-    // Step 7
     currentScore: 5, targetScore: 10,
     brushingTime: [] as string[], brushingDuration: '', tools: [] as string[],
     smoking: '', smokingCount: '', sleepTime: '',
@@ -116,15 +63,14 @@ export default function CompleteClinicForm() {
           setShowResume(true);
         }
       }
-    } catch { /* 無視 */ }
+    } catch {}
   }, []);
 
   const saveToStorage = useCallback((data: typeof initialFormData) => {
     try {
-      // 画像Base64は容量が大きいため保存から除外
       const { medicineImageBase64, ...rest } = data;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(rest));
-    } catch { /* 無視 */ }
+    } catch {}
   }, []);
 
   const handleResumeYes = () => {
@@ -132,9 +78,9 @@ export default function CompleteClinicForm() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setFormData(prev => ({ ...prev, ...parsed }));
+        setFormData((prev: typeof initialFormData) => ({ ...prev, ...parsed }));
       }
-    } catch { /* 無視 */ }
+    } catch {}
     setShowResume(false);
   };
 
@@ -150,7 +96,7 @@ export default function CompleteClinicForm() {
   }, [formData, saveToStorage]);
 
   // =========================================================
-  // 離脱防止（入力開始後）
+  // 離脱防止
   // =========================================================
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -166,10 +112,10 @@ export default function CompleteClinicForm() {
   const markStarted = () => { hasStartedRef.current = true; };
 
   // =========================================================
-  // 郵便番号→住所自動補完（zipcloud API）
+  // 郵便番号→住所自動補完
   // =========================================================
   const handleZipChange = async (val: string) => {
-    setFormData(prev => ({ ...prev, zip: val }));
+    setFormData((prev: typeof initialFormData) => ({ ...prev, zip: val }));
     markStarted();
     const clean = val.replace(/-/g, '');
     if (clean.length !== 7) return;
@@ -180,29 +126,27 @@ export default function CompleteClinicForm() {
       if (json.results && json.results[0]) {
         const r = json.results[0];
         const addr = `${r.address1}${r.address2}${r.address3}`;
-        setFormData(prev => ({ ...prev, address: addr }));
-        setFieldErrors(prev => ({ ...prev, zip: '' }));
+        setFormData((prev: typeof initialFormData) => ({ ...prev, address: addr }));
+        setFieldErrors((prev: Record<string, string>) => ({ ...prev, zip: '' }));
       } else {
-        setFieldErrors(prev => ({ ...prev, zip: '郵便番号が見つかりませんでした' }));
+        setFieldErrors((prev: Record<string, string>) => ({ ...prev, zip: '郵便番号が見つかりませんでした' }));
       }
     } catch {
-      setFieldErrors(prev => ({ ...prev, zip: '住所の取得に失敗しました' }));
+      setFieldErrors((prev: Record<string, string>) => ({ ...prev, zip: '住所の取得に失敗しました' }));
     } finally {
       setZipLoading(false);
     }
   };
 
   // =========================================================
-  // バリデーション（Step1）
+  // バリデーション
   // =========================================================
   const phoneRegex = /^[0-9\-\+\(\) ]{10,15}$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const validateStep1 = (): boolean => {
     const errors: Record<string, string> = {};
-    if (!formData.name.trim()) {
-      errors.name = 'お名前は必須です';
-    }
+    if (!formData.name.trim()) errors.name = 'お名前は必須です';
     if (!formData.phone.trim()) {
       errors.phone = '電話番号は必須です';
     } else if (!phoneRegex.test(formData.phone.replace(/\s/g, ''))) {
@@ -224,30 +168,26 @@ export default function CompleteClinicForm() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      setFieldErrors(prev => ({ ...prev, medicineImage: '5MB以下の画像を選択してください' }));
+      setFieldErrors((prev: Record<string, string>) => ({ ...prev, medicineImage: '5MB以下の画像を選択してください' }));
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target?.result as string;
       setImagePreview(base64);
-      setFormData(prev => ({
-        ...prev,
-        medicineImageBase64: base64,
-        medicineImageName: file.name
-      }));
-      setFieldErrors(prev => ({ ...prev, medicineImage: '' }));
+      setFormData((prev: typeof initialFormData) => ({ ...prev, medicineImageBase64: base64, medicineImageName: file.name }));
+      setFieldErrors((prev: Record<string, string>) => ({ ...prev, medicineImage: '' }));
     };
     reader.readAsDataURL(file);
   };
 
   const removeMedicineImage = () => {
     setImagePreview('');
-    setFormData(prev => ({ ...prev, medicineImageBase64: '', medicineImageName: '' }));
+    setFormData((prev: typeof initialFormData) => ({ ...prev, medicineImageBase64: '', medicineImageName: '' }));
   };
 
   // =========================================================
-  // 画面遷移（スライドアニメーション）
+  // 画面遷移
   // =========================================================
   const changeStep = (newStep: number, dir: 'forward' | 'backward') => {
     setDirection(dir);
@@ -259,85 +199,77 @@ export default function CompleteClinicForm() {
     if (step === 1 && !validateStep1()) return;
     changeStep(step + 1, 'forward');
   };
-
   const prev = () => changeStep(step - 1, 'backward');
   const goToStep = (s: number) => changeStep(s, s < step ? 'backward' : 'forward');
-
   const progress = (step / totalSteps) * 100;
 
   const toggleList = (list: string[], item: string, key: string) => {
     const newList = list.includes(item) ? list.filter(i => i !== item) : [...list, item];
-    setFormData(prev => ({ ...prev, [key]: newList }));
+    setFormData((prev: typeof initialFormData) => ({ ...prev, [key]: newList }));
     markStarted();
   };
 
   const setField = (key: string, value: any) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData((prev: typeof initialFormData) => ({ ...prev, [key]: value }));
     markStarted();
-    if (fieldErrors[key]) setFieldErrors(prev => ({ ...prev, [key]: '' }));
+    if (fieldErrors[key]) setFieldErrors((prev: Record<string, string>) => ({ ...prev, [key]: '' }));
   };
 
   // =========================================================
-  // GASへ送信（CORSモード + 3秒後リトライ1回 + 二重送信防止）
+  // GASへ送信（FormData + no-cors + リトライ + 二重送信防止）
   // =========================================================
-  const buildPayload = () => ({
-    name: formData.name,
-    furigana: formData.furigana,
-    gender: formData.gender,
-    birthday: formData.birthday,
-    zip: formData.zip,
-    address: formData.address,
-    phone: formData.phone,
-    email: formData.email,
-    trigger: formData.trigger,
-    referrerName: formData.referrerName,
-    referrerReason: formData.referrerReason,
-    reasons: formData.reasons,
-    mainComplaintDetail: formData.mainComplaintDetail,
-    allergy: formData.allergy,
-    allergyDetail: formData.allergyDetail,
-    anesthesiaStatus: formData.anesthesiaStatus,
-    anesthesiaDetail: formData.anesthesiaDetail,
-    hospitalStatus: formData.hospitalStatus,
-    diseaseName: formData.diseaseName,
-    hospitalName: formData.hospitalName,
-    medicineStatus: formData.medicineStatus,
-    medicineNames: formData.medicineNames,
-    // 画像はファイル名のみ送信（Base64は容量が大きすぎるためGASのメール通知には含めない）
-    medicineImageName: formData.medicineImageName,
-    medicineImageAttached: formData.medicineImageBase64 ? true : false,
-    commuteFrom: formData.commuteFrom,
-    availableDays: formData.availableDays,
-    commuteCondition: formData.commuteCondition,
-    preference: formData.preference,
-    mindset: formData.mindset,
-    explanationStyle: formData.explanationStyle,
-    currentScore: formData.currentScore,
-    targetScore: formData.targetScore,
-    brushingTime: formData.brushingTime,
-    brushingDuration: formData.brushingDuration,
-    tools: formData.tools,
-    smoking: formData.smoking,
-    smokingCount: formData.smokingCount,
-    sleepTime: formData.sleepTime,
-    beverageStatus: formData.beverageStatus,
-    beverageDetail: formData.beverageDetail,
-    snackHabit: formData.snackHabit,
-  });
-
   const doFetch = async () => {
-    const res = await fetch(GAS_URL, {
+    const fd = new FormData();
+    fd.append('name',                formData.name);
+    fd.append('furigana',            formData.furigana);
+    fd.append('gender',              formData.gender);
+    fd.append('birthday',            formData.birthday);
+    fd.append('zip',                 formData.zip);
+    fd.append('address',             formData.address);
+    fd.append('phone',               formData.phone);
+    fd.append('email',               formData.email);
+    fd.append('trigger',             formData.trigger);
+    fd.append('referrerName',        formData.referrerName);
+    fd.append('referrerReason',      formData.referrerReason);
+    fd.append('reasons',             formData.reasons.join(', '));
+    fd.append('mainComplaintDetail', formData.mainComplaintDetail);
+    fd.append('allergy',             formData.allergy);
+    fd.append('allergyDetail',       formData.allergyDetail);
+    fd.append('anesthesiaStatus',    formData.anesthesiaStatus);
+    fd.append('anesthesiaDetail',    formData.anesthesiaDetail);
+    fd.append('hospitalStatus',      formData.hospitalStatus);
+    fd.append('diseaseName',         formData.diseaseName);
+    fd.append('hospitalName',        formData.hospitalName);
+    fd.append('medicineStatus',      formData.medicineStatus);
+    fd.append('medicineNames',       formData.medicineNames);
+    fd.append('medicineImageName',   formData.medicineImageName);
+    fd.append('medicineImageAttached', formData.medicineImageBase64 ? 'あり' : 'なし');
+    fd.append('commuteFrom',         formData.commuteFrom);
+    fd.append('availableDays',       formData.availableDays.join(', '));
+    fd.append('commuteCondition',    formData.commuteCondition);
+    fd.append('preference',          formData.preference);
+    fd.append('mindset',             formData.mindset);
+    fd.append('explanationStyle',    formData.explanationStyle);
+    fd.append('currentScore',        String(formData.currentScore));
+    fd.append('targetScore',         String(formData.targetScore));
+    fd.append('brushingTime',        formData.brushingTime.join(', '));
+    fd.append('brushingDuration',    formData.brushingDuration);
+    fd.append('tools',               formData.tools.join(', '));
+    fd.append('smoking',             formData.smoking);
+    fd.append('smokingCount',        formData.smokingCount);
+    fd.append('sleepTime',           formData.sleepTime);
+    fd.append('beverageStatus',      formData.beverageStatus);
+    fd.append('beverageDetail',      formData.beverageDetail);
+    fd.append('snackHabit',          formData.snackHabit);
+    await fetch(GAS_URL, {
       method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload()),
+      mode: 'no-cors',
+      body: fd,
     });
-    const json = await res.json();
-    if (json.result !== 'success') throw new Error('GAS returned non-success');
   };
 
   const handleSubmit = async () => {
-    if (submitLockRef.current) return; // 二重送信防止
+    if (submitLockRef.current) return;
     submitLockRef.current = true;
     setIsSending(true);
     setSendError('');
@@ -346,7 +278,6 @@ export default function CompleteClinicForm() {
       localStorage.removeItem(STORAGE_KEY);
       setIsSent(true);
     } catch {
-      // 3秒後に1回だけ自動リトライ
       try {
         await new Promise(resolve => setTimeout(resolve, 3000));
         await doFetch();
@@ -354,7 +285,7 @@ export default function CompleteClinicForm() {
         setIsSent(true);
       } catch {
         setSendError('送信に失敗しました。通信環境をご確認の上、もう一度お試しください。');
-        submitLockRef.current = false; // エラー時は再試行を許可
+        submitLockRef.current = false;
       }
     } finally {
       setIsSending(false);
@@ -362,9 +293,9 @@ export default function CompleteClinicForm() {
   };
 
   // =========================================================
-  // UIコンポーネント・スタイル定義
+  // UIコンポーネント・スタイル
   // =========================================================
-  const LargeButton = ({ label, isSelected, onClick, type = "check" }: any) => (
+  const LargeButton = ({ label, isSelected, onClick, type = "check" }: { label: string; isSelected: boolean; onClick: () => void; type?: string }) => (
     <div onClick={onClick} style={{
         padding: '14px', borderRadius: '12px', marginBottom: '8px', cursor: 'pointer',
         border: isSelected ? `3px solid ${theme.main}` : '1px solid #e0e0e0',
@@ -386,9 +317,7 @@ export default function CompleteClinicForm() {
     width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #ddd',
     fontSize: '16px', marginBottom: '4px', outline: 'none', boxSizing: 'border-box'
   };
-  const inputErrorStyle: React.CSSProperties = {
-    ...inputStyle, border: '2px solid #e74c3c'
-  };
+  const inputErrorStyle: React.CSSProperties = { ...inputStyle, border: '2px solid #e74c3c' };
   const sectionTitle: React.CSSProperties = {
     fontSize: '18px', fontWeight: 'bold', color: theme.main, marginBottom: '15px',
     borderLeft: `5px solid ${theme.main}`, paddingLeft: '10px'
@@ -408,7 +337,6 @@ export default function CompleteClinicForm() {
     fontSize: '14px', fontWeight: 'bold', marginTop: '15px', marginBottom: '8px', display: 'block'
   };
 
-  // スライドアニメーション CSS
   const animStyle = `
     @keyframes slideInForward {
       from { opacity: 0; transform: translateX(36px); }
@@ -425,9 +353,6 @@ export default function CompleteClinicForm() {
     }
   `;
 
-  // =========================================================
-  // 確認サマリー用ヘルパーコンポーネント
-  // =========================================================
   const SummaryRow = ({ label, value }: { label: string; value: string }) =>
     value ? (
       <div style={{ display: 'flex', gap: '8px', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
@@ -436,23 +361,11 @@ export default function CompleteClinicForm() {
       </div>
     ) : null;
 
-  const SummarySection = ({
-    title, stepNum, children
-  }: { title: string; stepNum: number; children: React.ReactNode }) => (
+  const SummarySection = ({ title, stepNum, children }: { title: string; stepNum: number; children: React.ReactNode }) => (
     <div style={{ marginBottom: '14px', border: '1px solid #e8e8e8', borderRadius: '12px', overflow: 'hidden' }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: theme.sub, padding: '10px 14px',
-      }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: theme.sub, padding: '10px 14px' }}>
         <span style={{ fontSize: '14px', fontWeight: 'bold', color: theme.main }}>{title}</span>
-        <button
-          onClick={() => goToStep(stepNum)}
-          style={{
-            fontSize: '12px', color: theme.main, background: 'none',
-            border: `1px solid ${theme.main}`, borderRadius: '8px',
-            padding: '3px 10px', cursor: 'pointer'
-          }}
-        >修正</button>
+        <button onClick={() => goToStep(stepNum)} style={{ fontSize: '12px', color: theme.main, background: 'none', border: `1px solid ${theme.main}`, borderRadius: '8px', padding: '3px 10px', cursor: 'pointer' }}>修正</button>
       </div>
       <div style={{ padding: '8px 14px' }}>{children}</div>
     </div>
@@ -484,35 +397,14 @@ export default function CompleteClinicForm() {
 
       {/* 途中保存からの再開ダイアログ */}
       {showResume && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: '20px', padding: '28px 24px',
-            maxWidth: '340px', width: '90%', textAlign: 'center'
-          }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '28px 24px', maxWidth: '340px', width: '90%', textAlign: 'center' }}>
             <div style={{ fontSize: '32px', marginBottom: '12px' }}>📋</div>
             <h3 style={{ color: theme.main, marginBottom: '10px' }}>入力途中のデータがあります</h3>
-            <p style={{ fontSize: '14px', color: '#666', lineHeight: '1.6', marginBottom: '20px' }}>
-              前回の続きから入力を再開しますか？
-            </p>
+            <p style={{ fontSize: '14px', color: '#666', lineHeight: '1.6', marginBottom: '20px' }}>前回の続きから入力を再開しますか？</p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={handleResumeNo}
-                style={{
-                  flex: 1, padding: '12px', background: 'none', border: '1px solid #ddd',
-                  borderRadius: '10px', cursor: 'pointer', color: '#888', fontSize: '14px'
-                }}
-              >最初から</button>
-              <button
-                onClick={handleResumeYes}
-                style={{
-                  flex: 1, padding: '12px', background: theme.main, color: '#fff',
-                  border: 'none', borderRadius: '10px', cursor: 'pointer',
-                  fontWeight: 'bold', fontSize: '14px'
-                }}
-              >続きから再開</button>
+              <button onClick={handleResumeNo} style={{ flex: 1, padding: '12px', background: 'none', border: '1px solid #ddd', borderRadius: '10px', cursor: 'pointer', color: '#888', fontSize: '14px' }}>最初から</button>
+              <button onClick={handleResumeYes} style={{ flex: 1, padding: '12px', background: theme.main, color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>続きから再開</button>
             </div>
           </div>
         </div>
@@ -524,112 +416,41 @@ export default function CompleteClinicForm() {
           {/* ヘッダー */}
           <div style={{ background: theme.main, padding: '25px 20px', color: '#fff', textAlign: 'center' }}>
             <h1 style={{ fontSize: '18px', margin: 0, letterSpacing: '1px' }}>{theme.name}</h1>
-            <p style={{ margin: '6px 0 12px', fontSize: '12px', opacity: 0.7 }}>
-              STEP {step} / {totalSteps}
-            </p>
+            <p style={{ margin: '6px 0 12px', fontSize: '12px', opacity: 0.7 }}>STEP {step} / {totalSteps}</p>
             <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '2px' }}>
               <div style={{ width: `${progress}%`, height: '100%', backgroundColor: theme.accent, transition: '0.5s', borderRadius: '2px' }} />
             </div>
           </div>
 
-          {/* コンテンツ（Stepごとにアニメーション） */}
-          <div
-            key={step}
-            className={direction === 'forward' ? 'slide-forward' : 'slide-backward'}
-            style={{ padding: '20px' }}
-          >
+          <div key={step} className={direction === 'forward' ? 'slide-forward' : 'slide-backward'} style={{ padding: '20px' }}>
 
             {/* ===== STEP 1: 基本情報 ===== */}
             {step === 1 && (
               <div>
                 <h2 style={sectionTitle}>患者様の情報</h2>
-
-                <input
-                  type="text"
-                  placeholder="お名前 *"
-                  style={fieldErrors.name ? inputErrorStyle : inputStyle}
-                  value={formData.name}
-                  onChange={e => { setField('name', e.target.value); markStarted(); }}
-                />
+                <input type="text" placeholder="お名前 *" style={fieldErrors.name ? inputErrorStyle : inputStyle} value={formData.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setField('name', e.target.value); markStarted(); }} />
                 {fieldErrors.name && <p style={errorText}>{fieldErrors.name}</p>}
-
-                <input
-                  type="text"
-                  placeholder="フリガナ"
-                  style={{ ...inputStyle, marginTop: '8px' }}
-                  value={formData.furigana}
-                  onChange={e => { setField('furigana', e.target.value); markStarted(); }}
-                />
-
+                <input type="text" placeholder="フリガナ" style={{ ...inputStyle, marginTop: '8px' }} value={formData.furigana} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setField('furigana', e.target.value); markStarted(); }} />
                 <span style={questionLabel}>性別</span>
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                   <LargeButton label="男性" isSelected={formData.gender === '男性'} onClick={() => setField('gender', '男性')} type="radio" />
                   <LargeButton label="女性" isSelected={formData.gender === '女性'} onClick={() => setField('gender', '女性')} type="radio" />
                 </div>
-
                 <label style={{ fontSize: '12px', fontWeight: 'bold', color: theme.main }}>生年月日</label>
-                <input
-                  type="date"
-                  style={{ ...inputStyle, marginTop: '4px' }}
-                  value={formData.birthday}
-                  onChange={e => setField('birthday', e.target.value)}
-                />
-
+                <input type="date" style={{ ...inputStyle, marginTop: '4px' }} value={formData.birthday} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('birthday', e.target.value)} />
                 <div style={{ borderTop: '1px solid #eee', marginTop: '12px', paddingTop: '15px' }}>
-                  {/* 郵便番号（自動補完） */}
                   <div style={{ position: 'relative' }}>
-                    <input
-                      type="tel"
-                      placeholder="郵便番号（例：100-0001）"
-                      style={{ ...inputStyle, paddingRight: '60px' }}
-                      value={formData.zip}
-                      onChange={e => handleZipChange(e.target.value)}
-                    />
-                    {zipLoading && (
-                      <span style={{ position: 'absolute', right: '14px', top: '15px', fontSize: '12px', color: '#888' }}>
-                        検索中…
-                      </span>
-                    )}
+                    <input type="tel" placeholder="郵便番号（例：100-0001）" style={{ ...inputStyle, paddingRight: '60px' }} value={formData.zip} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleZipChange(e.target.value)} />
+                    {zipLoading && <span style={{ position: 'absolute', right: '14px', top: '15px', fontSize: '12px', color: '#888' }}>検索中…</span>}
                   </div>
                   {fieldErrors.zip && <p style={errorText}>{fieldErrors.zip}</p>}
-
-                  <input
-                    type="text"
-                    placeholder="ご住所（郵便番号入力で自動補完されます）"
-                    style={{ ...inputStyle, marginTop: '4px' }}
-                    value={formData.address}
-                    onChange={e => setField('address', e.target.value)}
-                  />
-
-                  <input
-                    type="tel"
-                    placeholder="電話番号 * （例：090-1234-5678）"
-                    style={fieldErrors.phone ? inputErrorStyle : { ...inputStyle, marginTop: '4px' }}
-                    value={formData.phone}
-                    onChange={e => { setField('phone', e.target.value); markStarted(); }}
-                  />
+                  <input type="text" placeholder="ご住所（郵便番号入力で自動補完されます）" style={{ ...inputStyle, marginTop: '4px' }} value={formData.address} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('address', e.target.value)} />
+                  <input type="tel" placeholder="電話番号 * （例：090-1234-5678）" style={fieldErrors.phone ? inputErrorStyle : { ...inputStyle, marginTop: '4px' }} value={formData.phone} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setField('phone', e.target.value); markStarted(); }} />
                   {fieldErrors.phone && <p style={errorText}>{fieldErrors.phone}</p>}
-
-                  <input
-                    type="email"
-                    placeholder="メールアドレス * （例：sample@example.com）"
-                    style={fieldErrors.email ? inputErrorStyle : { ...inputStyle, marginTop: '4px' }}
-                    value={formData.email}
-                    onChange={e => { setField('email', e.target.value); markStarted(); }}
-                  />
+                  <input type="email" placeholder="メールアドレス * （例：sample@example.com）" style={fieldErrors.email ? inputErrorStyle : { ...inputStyle, marginTop: '4px' }} value={formData.email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setField('email', e.target.value); markStarted(); }} />
                   {fieldErrors.email && <p style={errorText}>{fieldErrors.email}</p>}
                 </div>
-
-                <button
-                  onClick={next}
-                  style={{
-                    width: '100%', padding: '18px', background: theme.main, color: '#fff',
-                    borderRadius: '12px', fontWeight: 'bold', border: 'none', fontSize: '16px',
-                    cursor: 'pointer', marginTop: '12px'
-                  }}
-                >
-                  次へ進む ➔
-                </button>
+                <button onClick={next} style={{ width: '100%', padding: '18px', background: theme.main, color: '#fff', borderRadius: '12px', fontWeight: 'bold', border: 'none', fontSize: '16px', cursor: 'pointer', marginTop: '12px' }}>次へ進む ➔</button>
               </div>
             )}
 
@@ -638,30 +459,14 @@ export default function CompleteClinicForm() {
               <div>
                 <h2 style={sectionTitle}>来院のきっかけ</h2>
                 {['ホームページ', 'Googleマップ', '看板', '知人の紹介', 'Instagram', '通りがかり', 'その他'].map(t => (
-                  <LargeButton
-                    key={t} label={t}
-                    isSelected={formData.trigger === t}
-                    onClick={() => setField('trigger', t)}
-                    type="radio"
-                  />
+                  <LargeButton key={t} label={t} isSelected={formData.trigger === t} onClick={() => setField('trigger', t)} type="radio" />
                 ))}
                 {formData.trigger === '知人の紹介' && (
                   <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '12px', marginTop: '10px' }}>
-                    <input
-                      type="text"
-                      placeholder="紹介者のお名前"
-                      style={inputStyle}
-                      value={formData.referrerName}
-                      onChange={e => setField('referrerName', e.target.value)}
-                    />
+                    <input type="text" placeholder="紹介者のお名前" style={inputStyle} value={formData.referrerName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('referrerName', e.target.value)} />
                     <p style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>紹介いただいた理由</p>
                     {['丁寧だから', '安心安全だから', '治療がとても丁寧だから', 'スタッフがアットホームだから'].map(r => (
-                      <LargeButton
-                        key={r} label={r}
-                        isSelected={formData.referrerReason === r}
-                        onClick={() => setField('referrerReason', r)}
-                        type="radio"
-                      />
+                      <LargeButton key={r} label={r} isSelected={formData.referrerReason === r} onClick={() => setField('referrerReason', r)} type="radio" />
                     ))}
                   </div>
                 )}
@@ -676,29 +481,12 @@ export default function CompleteClinicForm() {
             {step === 3 && (
               <div>
                 <h2 style={sectionTitle}>本日の来院理由（複数可）</h2>
-                <div style={{
-                  maxHeight: '350px', overflowY: 'auto',
-                  border: `1px solid ${theme.sub}`, padding: '10px',
-                  borderRadius: '12px', marginBottom: '15px'
-                }}>
-                  {[
-                    '歯が痛い', '詰め物が取れた', '虫歯のチェック', '歯ぐきの腫れ・出血',
-                    'クリーニング・掃除', '矯正の相談', 'ホワイトニング', 'インプラント相談',
-                    '入れ歯の相談', '口臭が気になる', '前歯の見た目', '顎が痛い', '検診希望'
-                  ].map(r => (
-                    <LargeButton
-                      key={r} label={r}
-                      isSelected={formData.reasons.includes(r)}
-                      onClick={() => toggleList(formData.reasons, r, 'reasons')}
-                    />
+                <div style={{ maxHeight: '350px', overflowY: 'auto', border: `1px solid ${theme.sub}`, padding: '10px', borderRadius: '12px', marginBottom: '15px' }}>
+                  {['歯が痛い', '詰め物が取れた', '虫歯のチェック', '歯ぐきの腫れ・出血', 'クリーニング・掃除', '矯正の相談', 'ホワイトニング', 'インプラント相談', '入れ歯の相談', '口臭が気になる', '前歯の見た目', '顎が痛い', '検診希望'].map(r => (
+                    <LargeButton key={r} label={r} isSelected={formData.reasons.includes(r)} onClick={() => toggleList(formData.reasons, r, 'reasons')} />
                   ))}
                 </div>
-                <textarea
-                  placeholder="自由記入：詳しい症状や特にお困りのことをご記入ください"
-                  style={{ ...inputStyle, height: '90px', resize: 'vertical' }}
-                  value={formData.mainComplaintDetail}
-                  onChange={e => setField('mainComplaintDetail', e.target.value)}
-                />
+                <textarea placeholder="自由記入：詳しい症状や特にお困りのことをご記入ください" style={{ ...inputStyle, height: '90px', resize: 'vertical' } as React.CSSProperties} value={formData.mainComplaintDetail} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setField('mainComplaintDetail', e.target.value)} />
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={prev} style={navBtnStyle}>戻る</button>
                   <button onClick={next} style={nextBtnStyle}>次へ</button>
@@ -710,132 +498,57 @@ export default function CompleteClinicForm() {
             {step === 4 && (
               <div>
                 <h2 style={sectionTitle}>アレルギー・持病・麻酔</h2>
-
                 <span style={questionLabel}>薬や食べ物のアレルギーはありますか？</span>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {['あり', 'なし'].map(v => (
-                    <LargeButton key={v} label={v} isSelected={formData.allergy === v} onClick={() => setField('allergy', v)} type="radio" />
-                  ))}
+                  {['あり', 'なし'].map(v => <LargeButton key={v} label={v} isSelected={formData.allergy === v} onClick={() => setField('allergy', v)} type="radio" />)}
                 </div>
                 {formData.allergy === 'あり' && (
-                  <input
-                    type="text"
-                    placeholder="何のアレルギーですか？（起きた時の状況など）"
-                    style={{ ...inputStyle, marginTop: '8px' }}
-                    value={formData.allergyDetail}
-                    onChange={e => setField('allergyDetail', e.target.value)}
-                  />
+                  <input type="text" placeholder="何のアレルギーですか？（起きた時の状況など）" style={{ ...inputStyle, marginTop: '8px' }} value={formData.allergyDetail} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('allergyDetail', e.target.value)} />
                 )}
-
                 <span style={questionLabel}>歯科麻酔で気分が悪くなったことはありますか？</span>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {['あり', 'なし'].map(v => (
-                    <LargeButton key={v} label={v} isSelected={formData.anesthesiaStatus === v} onClick={() => setField('anesthesiaStatus', v)} type="radio" />
-                  ))}
+                  {['あり', 'なし'].map(v => <LargeButton key={v} label={v} isSelected={formData.anesthesiaStatus === v} onClick={() => setField('anesthesiaStatus', v)} type="radio" />)}
                 </div>
                 {formData.anesthesiaStatus === 'あり' && (
-                  <input
-                    type="text"
-                    placeholder="どのような状態になりましたか？"
-                    style={{ ...inputStyle, marginTop: '8px' }}
-                    value={formData.anesthesiaDetail}
-                    onChange={e => setField('anesthesiaDetail', e.target.value)}
-                  />
+                  <input type="text" placeholder="どのような状態になりましたか？" style={{ ...inputStyle, marginTop: '8px' }} value={formData.anesthesiaDetail} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('anesthesiaDetail', e.target.value)} />
                 )}
-
                 <span style={questionLabel}>現在通院中の病院はありますか？</span>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {['あり', 'なし'].map(v => (
-                    <LargeButton key={v} label={v} isSelected={formData.hospitalStatus === v} onClick={() => setField('hospitalStatus', v)} type="radio" />
-                  ))}
+                  {['あり', 'なし'].map(v => <LargeButton key={v} label={v} isSelected={formData.hospitalStatus === v} onClick={() => setField('hospitalStatus', v)} type="radio" />)}
                 </div>
                 {formData.hospitalStatus === 'あり' && (
                   <>
-                    <input
-                      type="text" placeholder="疾患名（病名）"
-                      style={{ ...inputStyle, marginTop: '8px' }}
-                      value={formData.diseaseName}
-                      onChange={e => setField('diseaseName', e.target.value)}
-                    />
-                    <input
-                      type="text" placeholder="病院名"
-                      style={inputStyle}
-                      value={formData.hospitalName}
-                      onChange={e => setField('hospitalName', e.target.value)}
-                    />
+                    <input type="text" placeholder="疾患名（病名）" style={{ ...inputStyle, marginTop: '8px' }} value={formData.diseaseName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('diseaseName', e.target.value)} />
+                    <input type="text" placeholder="病院名" style={inputStyle} value={formData.hospitalName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('hospitalName', e.target.value)} />
                   </>
                 )}
-
                 <span style={questionLabel}>現在服用中のお薬はありますか？</span>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {['あり', 'なし'].map(v => (
-                    <LargeButton key={v} label={v} isSelected={formData.medicineStatus === v} onClick={() => setField('medicineStatus', v)} type="radio" />
-                  ))}
+                  {['あり', 'なし'].map(v => <LargeButton key={v} label={v} isSelected={formData.medicineStatus === v} onClick={() => setField('medicineStatus', v)} type="radio" />)}
                 </div>
                 {formData.medicineStatus === 'あり' && (
                   <div style={{ marginTop: '8px' }}>
-                    <input
-                      type="text" placeholder="薬品名（わかる範囲で）"
-                      style={inputStyle}
-                      value={formData.medicineNames}
-                      onChange={e => setField('medicineNames', e.target.value)}
-                    />
-
-                    {/* お薬手帳画像アップロード */}
+                    <input type="text" placeholder="薬品名（わかる範囲で）" style={inputStyle} value={formData.medicineNames} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('medicineNames', e.target.value)} />
                     <div style={{ background: theme.sub, padding: '14px', borderRadius: '12px', marginTop: '6px' }}>
-                      <p style={{ fontSize: '13px', fontWeight: 'bold', color: theme.main, margin: '0 0 10px' }}>
-                        📷 お薬手帳の写真を添付（任意）
-                      </p>
+                      <p style={{ fontSize: '13px', fontWeight: 'bold', color: theme.main, margin: '0 0 10px' }}>📷 お薬手帳の写真を添付（任意）</p>
                       {!imagePreview ? (
-                        <label style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'center',
-                          justifyContent: 'center', padding: '20px',
-                          border: `2px dashed ${theme.main}`, borderRadius: '12px',
-                          cursor: 'pointer', background: '#fff', gap: '8px'
-                        }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', border: `2px dashed ${theme.main}`, borderRadius: '12px', cursor: 'pointer', background: '#fff', gap: '8px' }}>
                           <span style={{ fontSize: '28px' }}>📷</span>
-                          <span style={{ fontSize: '13px', color: theme.main, fontWeight: 'bold' }}>
-                            写真を撮る / ファイルを選ぶ
-                          </span>
-                          <span style={{ fontSize: '11px', color: '#aaa' }}>
-                            JPEG・PNG・GIF対応 / 5MBまで
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            style={{ display: 'none' }}
-                            onChange={handleMedicineImage}
-                          />
+                          <span style={{ fontSize: '13px', color: theme.main, fontWeight: 'bold' }}>写真を撮る / ファイルを選ぶ</span>
+                          <span style={{ fontSize: '11px', color: '#aaa' }}>JPEG・PNG・GIF対応 / 5MBまで</span>
+                          <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleMedicineImage} />
                         </label>
                       ) : (
                         <div style={{ position: 'relative', textAlign: 'center' }}>
-                          <img
-                            src={imagePreview}
-                            alt="お薬手帳プレビュー"
-                            style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '10px', border: '1px solid #ddd' }}
-                          />
-                          <button
-                            onClick={removeMedicineImage}
-                            style={{
-                              position: 'absolute', top: '6px', right: '6px',
-                              background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none',
-                              borderRadius: '50%', width: '28px', height: '28px',
-                              cursor: 'pointer', fontSize: '14px', lineHeight: '28px'
-                            }}
-                          >✕</button>
-                          <p style={{ fontSize: '12px', color: '#666', marginTop: '6px' }}>
-                            {formData.medicineImageName}
-                          </p>
+                          <img src={imagePreview} alt="お薬手帳プレビュー" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '10px', border: '1px solid #ddd' }} />
+                          <button onClick={removeMedicineImage} style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', fontSize: '14px', lineHeight: '28px' }}>✕</button>
+                          <p style={{ fontSize: '12px', color: '#666', marginTop: '6px' }}>{formData.medicineImageName}</p>
                         </div>
                       )}
-                      {fieldErrors.medicineImage && (
-                        <p style={errorText}>{fieldErrors.medicineImage}</p>
-                      )}
+                      {fieldErrors.medicineImage && <p style={errorText}>{fieldErrors.medicineImage}</p>}
                     </div>
                   </div>
                 )}
-
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                   <button onClick={prev} style={navBtnStyle}>戻る</button>
                   <button onClick={next} style={nextBtnStyle}>次へ</button>
@@ -847,31 +560,24 @@ export default function CompleteClinicForm() {
             {step === 5 && (
               <div>
                 <h2 style={sectionTitle}>通院のご希望</h2>
-
                 <span style={questionLabel}>どちらから来院されますか？</span>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {['自宅', '勤務先'].map(v => (
-                    <LargeButton key={v} label={v} isSelected={formData.commuteFrom === v} onClick={() => setField('commuteFrom', v)} type="radio" />
-                  ))}
+                  {['自宅', '勤務先'].map(v => <LargeButton key={v} label={v} isSelected={formData.commuteFrom === v} onClick={() => setField('commuteFrom', v)} type="radio" />)}
                 </div>
-
                 <span style={questionLabel}>来院可能な曜日（複数可）</span>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginBottom: '15px' }}>
                   {['月', '火', '水', '木', '金', '土', '日'].map(d => (
                     <LargeButton key={d} label={d} isSelected={formData.availableDays.includes(d)} onClick={() => toggleList(formData.availableDays, d, 'availableDays')} />
                   ))}
                 </div>
-
                 <span style={questionLabel}>時間帯のご希望</span>
                 {['医院の予定に合わせる', '午前', '午後', 'PM6時以降しか来れない', '不定期'].map(c => (
                   <LargeButton key={c} label={c} isSelected={formData.commuteCondition === c} onClick={() => setField('commuteCondition', c)} type="radio" />
                 ))}
-
                 <span style={questionLabel}>治療へのご要望</span>
                 {['なるべく保険内で', '自費含め最善を', '痛みをおさえて', '回数を少なく'].map(v => (
                   <LargeButton key={v} label={v} isSelected={formData.preference === v} onClick={() => setField('preference', v)} type="radio" />
                 ))}
-
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                   <button onClick={prev} style={navBtnStyle}>戻る</button>
                   <button onClick={next} style={nextBtnStyle}>次へ</button>
@@ -883,22 +589,14 @@ export default function CompleteClinicForm() {
             {step === 6 && (
               <div>
                 <h2 style={sectionTitle}>カウンセリング</h2>
-
                 <span style={questionLabel}>1. 来院時の気持ち</span>
                 {['少し不安・怖さがある', '現状をチェックしてもらえるので楽しみ', '普通'].map(m => (
                   <LargeButton key={m} label={m} isSelected={formData.mindset === m} onClick={() => setField('mindset', m)} type="radio" />
                 ))}
-
                 <span style={questionLabel}>2. 安心できる説明の受け方</span>
-                {[
-                  '個別でしっかり説明してほしい',
-                  '書面や図でわかりやすく説明してほしい',
-                  'ざっくりで構わないが、ポイントだけ知りたい',
-                  '説明してもらえるだけで安心できる'
-                ].map(s => (
+                {['個別でしっかり説明してほしい', '書面や図でわかりやすく説明してほしい', 'ざっくりで構わないが、ポイントだけ知りたい', '説明してもらえるだけで安心できる'].map(s => (
                   <LargeButton key={s} label={s} isSelected={formData.explanationStyle === s} onClick={() => setField('explanationStyle', s)} type="radio" />
                 ))}
-
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                   <button onClick={prev} style={navBtnStyle}>戻る</button>
                   <button onClick={next} style={nextBtnStyle}>次へ</button>
@@ -910,50 +608,34 @@ export default function CompleteClinicForm() {
             {step === 7 && (
               <div>
                 <h2 style={sectionTitle}>生活習慣アンケート</h2>
-
                 <span style={questionLabel}>歯磨きのタイミング（複数可）</span>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '15px' }}>
                   {['起床時', '朝食後', '昼食後', '晩食後', '就寝前'].map(t => (
                     <LargeButton key={t} label={t} isSelected={formData.brushingTime.includes(t)} onClick={() => toggleList(formData.brushingTime, t, 'brushingTime')} />
                   ))}
                 </div>
-
                 <span style={questionLabel}>清掃用具の使用（複数可）</span>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px', marginBottom: '15px' }}>
                   {['歯ブラシのみ', 'フロス', '歯間ブラシ', '洗口剤', '電動歯ブラシ'].map(t => (
                     <LargeButton key={t} label={t} isSelected={formData.tools.includes(t)} onClick={() => toggleList(formData.tools, t, 'tools')} />
                   ))}
                 </div>
-
                 <span style={questionLabel}>喫煙習慣</span>
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
                   {['あり', 'なし', '過去にあり'].map(v => (
                     <LargeButton key={v} label={v} isSelected={formData.smoking === v} onClick={() => setField('smoking', v)} type="radio" />
                   ))}
                 </div>
-
                 <div style={{ background: theme.sub, padding: '15px', borderRadius: '15px', marginTop: '10px' }}>
                   <p style={{ fontSize: '14px', fontWeight: 'bold', marginTop: 0 }}>
                     今の口の健康意識（10点満点）：<b style={{ color: theme.main }}>{formData.currentScore}点</b>
                   </p>
-                  <input
-                    type="range" min="0" max="10" step="1"
-                    value={formData.currentScore}
-                    onChange={e => setField('currentScore', parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: theme.main }}
-                  />
-
+                  <input type="range" min="0" max="10" step="1" value={formData.currentScore} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('currentScore', parseInt(e.target.value))} style={{ width: '100%', accentColor: theme.main } as React.CSSProperties} />
                   <p style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '15px' }}>
                     今後の目標スコア（10点満点）：<b style={{ color: theme.main }}>{formData.targetScore}点</b>
                   </p>
-                  <input
-                    type="range" min="0" max="10" step="1"
-                    value={formData.targetScore}
-                    onChange={e => setField('targetScore', parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: theme.main }}
-                  />
+                  <input type="range" min="0" max="10" step="1" value={formData.targetScore} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField('targetScore', parseInt(e.target.value))} style={{ width: '100%', accentColor: theme.main } as React.CSSProperties} />
                 </div>
-
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                   <button onClick={prev} style={navBtnStyle}>戻る</button>
                   <button onClick={next} style={nextBtnStyle}>確認へ</button>
@@ -965,10 +647,7 @@ export default function CompleteClinicForm() {
             {step === 8 && (
               <div>
                 <h2 style={sectionTitle}>入力内容の確認</h2>
-                <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
-                  「修正」ボタンで各ページに戻って内容を変更できます。
-                </p>
-
+                <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>「修正」ボタンで各ページに戻って内容を変更できます。</p>
                 <SummarySection title="患者様の情報" stepNum={1}>
                   <SummaryRow label="お名前" value={formData.name} />
                   <SummaryRow label="フリガナ" value={formData.furigana} />
@@ -979,18 +658,15 @@ export default function CompleteClinicForm() {
                   <SummaryRow label="電話番号" value={formData.phone} />
                   <SummaryRow label="メールアドレス" value={formData.email} />
                 </SummarySection>
-
                 <SummarySection title="来院のきっかけ" stepNum={2}>
                   <SummaryRow label="きっかけ" value={formData.trigger} />
                   <SummaryRow label="紹介者" value={formData.referrerName} />
                   <SummaryRow label="紹介理由" value={formData.referrerReason} />
                 </SummarySection>
-
                 <SummarySection title="来院理由" stepNum={3}>
                   <SummaryRow label="症状・理由" value={formData.reasons.join('、')} />
                   <SummaryRow label="詳細" value={formData.mainComplaintDetail} />
                 </SummarySection>
-
                 <SummarySection title="アレルギー・持病・麻酔" stepNum={4}>
                   <SummaryRow label="アレルギー" value={formData.allergy} />
                   <SummaryRow label="アレルギー詳細" value={formData.allergyDetail} />
@@ -1003,33 +679,22 @@ export default function CompleteClinicForm() {
                   <SummaryRow label="薬品名" value={formData.medicineNames} />
                   {formData.medicineImageBase64 && (
                     <div style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-                      <span style={{ fontSize: '12px', color: '#888', display: 'block', marginBottom: '6px' }}>
-                        お薬手帳の写真
-                      </span>
-                      <img
-                        src={formData.medicineImageBase64}
-                        alt="お薬手帳"
-                        style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', border: '1px solid #eee' }}
-                      />
-                      <p style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-                        {formData.medicineImageName}
-                      </p>
+                      <span style={{ fontSize: '12px', color: '#888', display: 'block', marginBottom: '6px' }}>お薬手帳の写真</span>
+                      <img src={formData.medicineImageBase64} alt="お薬手帳" style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', border: '1px solid #eee' }} />
+                      <p style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{formData.medicineImageName}</p>
                     </div>
                   )}
                 </SummarySection>
-
                 <SummarySection title="通院のご希望" stepNum={5}>
                   <SummaryRow label="来院元" value={formData.commuteFrom} />
                   <SummaryRow label="来院可能な曜日" value={formData.availableDays.join('・')} />
                   <SummaryRow label="時間帯のご希望" value={formData.commuteCondition} />
                   <SummaryRow label="治療へのご要望" value={formData.preference} />
                 </SummarySection>
-
                 <SummarySection title="カウンセリング" stepNum={6}>
                   <SummaryRow label="来院時の気持ち" value={formData.mindset} />
                   <SummaryRow label="説明の希望" value={formData.explanationStyle} />
                 </SummarySection>
-
                 <SummarySection title="生活習慣" stepNum={7}>
                   <SummaryRow label="歯磨きタイミング" value={formData.brushingTime.join('・')} />
                   <SummaryRow label="清掃用具" value={formData.tools.join('・')} />
@@ -1037,7 +702,6 @@ export default function CompleteClinicForm() {
                   <SummaryRow label="健康意識スコア" value={`${formData.currentScore}点`} />
                   <SummaryRow label="目標スコア" value={`${formData.targetScore}点`} />
                 </SummarySection>
-
                 <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                   <button onClick={prev} style={navBtnStyle}>戻る</button>
                   <button onClick={next} style={nextBtnStyle}>問題なければ次へ</button>
@@ -1049,69 +713,32 @@ export default function CompleteClinicForm() {
             {step === 9 && (
               <div style={{ textAlign: 'center' }}>
                 <h2 style={sectionTitle}>当院の想い</h2>
-                <div style={{
-                  background: theme.sub, padding: '20px', borderRadius: '15px',
-                  lineHeight: '1.8', fontSize: '14px', marginBottom: '20px',
-                  textAlign: 'left', border: `1px dashed ${theme.main}`
-                }}>
+                <div style={{ background: theme.sub, padding: '20px', borderRadius: '15px', lineHeight: '1.8', fontSize: '14px', marginBottom: '20px', textAlign: 'left', border: `1px dashed ${theme.main}` }}>
                   <p style={{ margin: 0 }}>
                     我々は <b>"一生自分の歯で食事ができること"</b> をサポートします。<br />
                     メンテナンスを中心とした最小限の治療を追求することが、皆様の人生を豊かにすると信じております。<br />
                     お困りごとは何でもご相談ください。これが当院の夢です。
                   </p>
                 </div>
-
                 {isSending && (
-                  <div style={{
-                    background: theme.sub, borderRadius: '12px', padding: '14px',
-                    marginBottom: '16px', fontSize: '14px', color: theme.main
-                  }}>
+                  <div style={{ background: theme.sub, borderRadius: '12px', padding: '14px', marginBottom: '16px', fontSize: '14px', color: theme.main }}>
                     送信中です。しばらくお待ちください…<br />
-                    <span style={{ fontSize: '12px', color: '#888' }}>
-                      ※ 通信状況により少し時間がかかる場合があります（自動リトライあり）
-                    </span>
+                    <span style={{ fontSize: '12px', color: '#888' }}>※ 通信状況により少し時間がかかる場合があります（自動リトライあり）</span>
                   </div>
                 )}
-
                 {sendError && (
-                  <div style={{
-                    background: '#fff0f0', border: '1px solid #ffaaaa',
-                    borderRadius: '12px', padding: '14px', marginBottom: '16px',
-                    color: '#cc0000', fontSize: '14px'
-                  }}>
+                  <div style={{ background: '#fff0f0', border: '1px solid #ffaaaa', borderRadius: '12px', padding: '14px', marginBottom: '16px', color: '#cc0000', fontSize: '14px' }}>
                     {sendError}
                   </div>
                 )}
-
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSending}
-                  style={{
-                    width: '100%', padding: '20px',
-                    background: isSending ? '#aaa' : theme.main,
-                    color: '#fff', borderRadius: '12px', border: 'none',
-                    fontWeight: 'bold', fontSize: '18px',
-                    cursor: isSending ? 'not-allowed' : 'pointer',
-                    boxShadow: isSending ? 'none' : `0 4px 15px ${theme.main}44`,
-                    transition: '0.3s'
-                  }}
-                >
+                <button onClick={handleSubmit} disabled={isSending} style={{ width: '100%', padding: '20px', background: isSending ? '#aaa' : theme.main, color: '#fff', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '18px', cursor: isSending ? 'not-allowed' : 'pointer', boxShadow: isSending ? 'none' : `0 4px 15px ${theme.main}44`, transition: '0.3s' }}>
                   {isSending ? '送信中…⏳' : '同意して送信する ✉️'}
                 </button>
-
-                <button
-                  onClick={prev}
-                  style={{
-                    marginTop: '15px', background: 'none', border: 'none',
-                    color: '#888', textDecoration: 'underline', cursor: 'pointer'
-                  }}
-                >
-                  内容を修正する
-                </button>
+                <button onClick={prev} style={{ marginTop: '15px', background: 'none', border: 'none', color: '#888', textDecoration: 'underline', cursor: 'pointer' }}>内容を修正する</button>
               </div>
             )}
 
-          </div>{/* end animation wrapper */}
+          </div>
         </div>
       </div>
     </>
