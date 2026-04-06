@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 // 1:ネイビー(信頼)  2:サクラ(優しい)  3:ミント(清潔)  4:ゴールド(高級)
 const DESIGN_TYPE = 1;
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzEo1Mkz4PQyITdsIWUgkWt9RIxU3vbl6uCpelttw9FrwW8-n8xq664RSGrqTsIZXBGkA/exec";
+const GAS_URL = "AKfycbztTPKtxkVteG5L3oEADxdH4NZrvWuGYqQ64fkO1uyxxyTdkP7dhnKlB9xd8Mt2yylRLQ";
 const STORAGE_KEY = "dental_form_draft";
 
 // =========================================================
